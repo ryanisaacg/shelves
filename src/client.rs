@@ -8,12 +8,14 @@ use std::{
 use rustls::{pki_types::InvalidDnsNameError, ClientConfig};
 use thiserror::Error;
 
-use crate::url::{Scheme, Url};
+use crate::url::{Scheme, Url, UrlError};
 
 pub struct Client {
     config: Arc<ClientConfig>,
     static_hosts: HashSet<&'static str>,
 }
+
+const MAX_REDIRECTS: u16 = 128;
 
 impl Client {
     pub fn new() -> Client {
@@ -32,6 +34,14 @@ impl Client {
     }
 
     pub fn request(&mut self, url: &Url) -> Result<String, RequestError> {
+        self.request_internal(url, MAX_REDIRECTS)
+    }
+
+    pub fn request_internal(
+        &mut self,
+        url: &Url,
+        remaining_redirects: u16,
+    ) -> Result<String, RequestError> {
         let host = url.host();
 
         let mut response = String::new();
@@ -63,7 +73,10 @@ impl Client {
 
         let mut status_compponents = statusline.split(" ");
         let _version = status_compponents.next().ok_or(RequestError::BadHTTP)?;
-        let _status = status_compponents.next().ok_or(RequestError::BadHTTP)?;
+        let status_code = status_compponents.next().ok_or(RequestError::BadHTTP)?;
+        let status_code: u16 = status_code
+            .parse()
+            .map_err(|_| RequestError::InvalidStatusCode(status_code.to_string()))?;
         let _explanation = status_compponents.next().ok_or(RequestError::BadHTTP)?;
 
         let mut headers = HashMap::new();
@@ -72,11 +85,26 @@ impl Client {
             if header_line.is_empty() {
                 break;
             }
-            let (header, value) = header_line.split_once(" ").ok_or(RequestError::BadHTTP)?;
+            let (header, value) = header_line.split_once(": ").ok_or(RequestError::BadHTTP)?;
             headers.insert(header.to_string(), value.to_string());
         }
         assert!(!headers.contains_key("transfer-encoding"));
         assert!(!headers.contains_key("content-encoding"));
+
+        if status_code >= 300 && status_code < 400 {
+            if remaining_redirects > 0 {
+                if let Some(location) = headers.remove("Location") {
+                    let redirect = if location.starts_with("/") {
+                        url.with_path(location)
+                    } else {
+                        Url::new(location).map_err(|e| RequestError::BadRedirectUrl(e))?
+                    };
+                    return self.request_internal(&redirect, remaining_redirects - 1);
+                }
+            } else {
+                return Err(RequestError::MaximumRedirects);
+            }
+        }
 
         Ok(lines.collect::<Vec<_>>().join("\n"))
     }
@@ -123,8 +151,14 @@ pub enum RequestError {
     TlsError(#[from] rustls::Error),
     #[error("dns error: {0}")]
     InvalidDns(#[from] InvalidDnsNameError),
+    #[error("invalid status code: {0}")]
+    InvalidStatusCode(String),
     #[error("unexpected end of input reading request")]
     UnexpectedEndOfInput,
     #[error("malformed HTTP")]
     BadHTTP,
+    #[error("bad redirect URL: {0}")]
+    BadRedirectUrl(UrlError),
+    #[error("maximum redirects exceeded")]
+    MaximumRedirects,
 }

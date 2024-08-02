@@ -51,6 +51,13 @@ impl Url {
         })
     }
 
+    pub fn with_path(&self, path: String) -> Url {
+        Url {
+            path,
+            ..self.clone()
+        }
+    }
+
     pub fn host(&self) -> &str {
         &self.url[self.host.clone()]
     }
