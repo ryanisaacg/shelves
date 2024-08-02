@@ -21,6 +21,7 @@ impl Url {
         let scheme = match &url[..scheme_end] {
             "http" => Scheme::Http,
             "https" => Scheme::Https,
+            "file" => Scheme::File,
             other => return Err(UrlError::UnknownScheme(other.to_string())),
         };
 
@@ -71,6 +72,7 @@ impl Url {
 pub enum Scheme {
     Http,
     Https,
+    File,
 }
 
 #[derive(Debug, Error)]

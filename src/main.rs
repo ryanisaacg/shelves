@@ -8,7 +8,13 @@ mod url;
 fn main() -> anyhow::Result<()> {
     let mut args = std::env::args();
     args.next().unwrap(); // discard binary name
-    let url = args.next().unwrap();
+    let url = match args.next() {
+        Some(url) => url,
+        None => {
+            let dir = std::env::current_dir()?;
+            format!("file://{}/test.html", dir.to_str().unwrap())
+        }
+    };
 
     let input = Url::new(url)?;
     let mut client = Client::new();

@@ -53,6 +53,9 @@ impl Client {
                 self.send_get(url, &mut stream)?;
                 stream.read_to_string(&mut response)?;
             }
+            Scheme::File => {
+                return Ok(std::fs::read_to_string(url.path())?);
+            }
         }
 
         let mut lines = response.split("\r\n");
