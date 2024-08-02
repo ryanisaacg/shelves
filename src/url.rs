@@ -2,6 +2,7 @@ use std::{
     collections::HashMap,
     io::{self, Read, Write},
     net::TcpStream,
+    num::ParseIntError,
     ops::Range,
     sync::Arc,
 };
@@ -13,6 +14,7 @@ pub struct Url {
     scheme: Scheme,
     host: Range<usize>,
     path: String,
+    port: Option<u16>,
 }
 
 const SCHEME_SEPERATOR: &str = "://";
@@ -29,21 +31,33 @@ impl Url {
         };
 
         let host_start = scheme_end + SCHEME_SEPERATOR.len();
-        let split = url[host_start..]
+        let host_end = url[host_start..]
             .find('/')
-            .unwrap_or(url.len() - host_start);
-        let path = format!("/{}", &url[(host_start + split)..url.len()]);
+            .unwrap_or(url.len() - host_start)
+            + host_start;
+        let path = format!("/{}", &url[host_end..url.len()]);
+
+        let mut host = host_start..host_end;
+        let port = match &url[host_start..host_end].find(':') {
+            Some(idx) => {
+                host.end = host_start + *idx;
+                let port_str = &url[(host_start + idx + 1)..(host_start + host_end)];
+                Some(dbg!(port_str).parse()?)
+            }
+            None => None,
+        };
 
         Ok(Url {
             url,
             scheme,
-            host: host_start..(host_start + split),
+            port,
+            host,
             path,
         })
     }
 
     fn host(&self) -> &str {
-        &self.url[self.host.clone()]
+        dbg!(&self.url[self.host.clone()])
     }
 
     pub fn request(&self) -> Result<String, RequestError> {
@@ -52,7 +66,7 @@ impl Url {
         let mut response = String::new();
         match self.scheme {
             Scheme::Http => {
-                let mut stream = TcpStream::connect((host, 80))?;
+                let mut stream = TcpStream::connect((host, self.port.unwrap_or(80)))?;
 
                 self.send_get(&mut stream)?;
                 stream.read_to_string(&mut response)?;
@@ -72,7 +86,7 @@ impl Url {
                 let example_com = static_host.try_into().unwrap();
                 let mut client = rustls::ClientConnection::new(rc_config, example_com)?;
 
-                let mut stream = TcpStream::connect((host, 443))?;
+                let mut stream = TcpStream::connect((host, self.port.unwrap_or(443)))?;
                 let mut stream = rustls::Stream::new(&mut client, &mut stream);
 
                 self.send_get(&mut stream)?;
@@ -118,6 +132,8 @@ enum Scheme {
 pub enum UrlError {
     #[error("invalid URL: must have a scheme")]
     NoSchemeProvided,
+    #[error("invalid port integer: {0}")]
+    InvalidPortInt(#[from] ParseIntError),
     #[error("unknown scheme: {0}")]
     UnknownScheme(String),
 }
