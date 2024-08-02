@@ -7,7 +7,7 @@ fn main() -> anyhow::Result<()> {
     args.next().unwrap(); // discard binary name
     let url = args.next().unwrap();
 
-    let example = Url::new(url);
+    let example = Url::new(url)?;
     show(example.request()?.as_str());
 
     Ok(())
