@@ -42,6 +42,7 @@ impl Client {
         url: &Url,
         remaining_redirects: u16,
     ) -> Result<String, RequestError> {
+        eprintln!("Making a GET request to {url}");
         let host = url.host();
 
         let mut response = String::new();
@@ -92,17 +93,19 @@ impl Client {
         assert!(!headers.contains_key("content-encoding"));
 
         if status_code >= 300 && status_code < 400 {
-            if remaining_redirects > 0 {
-                if let Some(location) = headers.remove("Location") {
-                    let redirect = if location.starts_with("/") {
-                        url.with_path(location)
-                    } else {
-                        Url::new(location).map_err(|e| RequestError::BadRedirectUrl(e))?
-                    };
-                    return self.request_internal(&redirect, remaining_redirects - 1);
-                }
-            } else {
+            if remaining_redirects == 0 {
                 return Err(RequestError::MaximumRedirects);
+            }
+
+            if let Some(location) = headers.remove("Location") {
+                let redirect = if location.trim().starts_with("/") {
+                    url.with_path(location.trim().to_string())
+                } else {
+                    Url::new(location.clone())
+                        .map_err(|e| RequestError::BadRedirectUrl(location, e))?
+                };
+                eprintln!("Redirecting from {url} to {redirect}");
+                return self.request_internal(&redirect, remaining_redirects - 1);
             }
         }
 
@@ -157,8 +160,8 @@ pub enum RequestError {
     UnexpectedEndOfInput,
     #[error("malformed HTTP")]
     BadHTTP,
-    #[error("bad redirect URL: {0}")]
-    BadRedirectUrl(UrlError),
+    #[error("bad redirect URL {0}: {1}")]
+    BadRedirectUrl(String, UrlError),
     #[error("maximum redirects exceeded")]
     MaximumRedirects,
 }
