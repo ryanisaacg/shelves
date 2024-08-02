@@ -24,17 +24,43 @@ fn main() -> anyhow::Result<()> {
 }
 
 fn show(html: &str) {
-    let mut in_tag = false;
+    let mut state = ParseState::InTag;
+    let mut escape_sequence = String::new();
+
     for ch in html.chars() {
-        match ch {
-            '<' => {
-                in_tag = true;
+        if state == ParseState::InTag {
+            if ch == '>' {
+                state = ParseState::Text;
             }
-            '>' => {
-                in_tag = false;
+        } else {
+            match ch {
+                '<' => {
+                    state = ParseState::InTag;
+                }
+                '&' => {
+                    state = ParseState::EscapeSequence;
+                }
+                ';' if state == ParseState::EscapeSequence => {
+                    match escape_sequence.as_str() {
+                        "lt" => print!("<"),
+                        "gt" => print!(">"),
+                        not_recognized => print!("&{};", not_recognized),
+                    }
+                    escape_sequence.clear();
+                    state = ParseState::Text;
+                }
+                _ if state == ParseState::EscapeSequence => {
+                    escape_sequence.push(ch);
+                }
+                _ => print!("{ch}"),
             }
-            _ if !in_tag => print!("{ch}"),
-            _ => {}
         }
     }
+}
+
+#[derive(Copy, Clone, PartialEq, Eq)]
+enum ParseState {
+    InTag,
+    EscapeSequence,
+    Text,
 }
