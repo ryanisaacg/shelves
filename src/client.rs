@@ -5,7 +5,7 @@ use std::{
     sync::Arc,
 };
 
-use rustls::ClientConfig;
+use rustls::{pki_types::InvalidDnsNameError, ClientConfig};
 use thiserror::Error;
 
 use crate::url::{Scheme, Url};
@@ -43,11 +43,9 @@ impl Client {
                 stream.read_to_string(&mut response)?;
             }
             Scheme::Https => {
-                // Set up TLS connection
-                // TODO: if we must leak, at least cache the leaked memory
-                let static_host = host.to_string().leak() as &'static str;
-                let example_com = static_host.try_into().unwrap();
-                let mut client = rustls::ClientConnection::new(self.config.clone(), example_com)?;
+                let static_host = self.static_host(host);
+                let mut client =
+                    rustls::ClientConnection::new(self.config.clone(), static_host.try_into()?)?;
 
                 let mut stream = TcpStream::connect((host, url.port().unwrap_or(443)))?;
                 let mut stream = rustls::Stream::new(&mut client, &mut stream);
@@ -84,6 +82,20 @@ impl Client {
         write!(stream, "\r\n")?;
         Ok(())
     }
+
+    /**
+     * Pull the static str from cache or create and cache a new one
+     */
+    fn static_host(&mut self, host: &str) -> &'static str {
+        match self.static_hosts.get(host) {
+            Some(static_host) => *static_host,
+            None => {
+                let static_host = host.to_string().leak() as &'static str;
+                self.static_hosts.insert(static_host);
+                static_host
+            }
+        }
+    }
 }
 
 #[derive(Debug, Error)]
@@ -92,6 +104,8 @@ pub enum RequestError {
     IOError(#[from] io::Error),
     #[error("tls error: {0}")]
     TlsError(#[from] rustls::Error),
+    #[error("dns error: {0}")]
+    InvalidDns(#[from] InvalidDnsNameError),
     #[error("unexpected end of input reading request")]
     UnexpectedEndOfInput,
     #[error("malformed HTTP")]
