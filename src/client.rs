@@ -77,9 +77,21 @@ impl Client {
     }
 
     fn send_get(&self, url: &Url, stream: &mut dyn Write) -> Result<(), RequestError> {
-        write!(stream, "GET {} HTTP/1.0\r\n", url.path())?;
-        write!(stream, "Host: {}\r\n", url.host())?;
+        write!(stream, "GET {} HTTP/1.1\r\n", url.path())?;
+        self.header_line(stream, "host", url.host())?;
+        self.header_line(stream, "Connection", "close")?;
+        self.header_line(stream, "User-Agent", "shelves")?;
         write!(stream, "\r\n")?;
+        Ok(())
+    }
+
+    fn header_line(
+        &self,
+        stream: &mut dyn Write,
+        key: &str,
+        value: &str,
+    ) -> Result<(), RequestError> {
+        write!(stream, "{}: {}\r\n", key, value)?;
         Ok(())
     }
 
