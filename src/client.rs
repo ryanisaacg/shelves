@@ -75,6 +75,8 @@ impl Client {
             let (header, value) = header_line.split_once(" ").ok_or(RequestError::BadHTTP)?;
             headers.insert(header.to_string(), value.to_string());
         }
+        assert!(!headers.contains_key("transfer-encoding"));
+        assert!(!headers.contains_key("content-encoding"));
 
         Ok(lines.collect::<Vec<_>>().join("\n"))
     }
