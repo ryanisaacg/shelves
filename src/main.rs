@@ -18,7 +18,10 @@ fn main() -> anyhow::Result<()> {
 
     let input = Url::new(url)?;
     let mut client = Client::new();
-    show(client.request(&input)?.as_str());
+    let resp = client.request(&input)?;
+
+    println!("{:?}", resp.headers);
+    show(resp.body.as_str()?);
 
     Ok(())
 }
