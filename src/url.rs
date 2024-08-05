@@ -30,7 +30,13 @@ impl Url {
             .find('/')
             .unwrap_or(url.len() - host_start)
             + host_start;
-        let path = format!("/{}", &url[host_end..url.len()]);
+
+        let mut path = String::new();
+        if host_end == url.len() {
+            path.push('/');
+        } else {
+            path.push_str(&url[host_end..url.len()]);
+        }
 
         let mut host = host_start..host_end;
         let port = match &url[host_start..host_end].find(':') {
@@ -86,7 +92,7 @@ impl Display for Url {
     }
 }
 
-#[derive(Copy, Clone, Eq, PartialEq)]
+#[derive(Copy, Clone, Eq, PartialEq, Hash)]
 pub enum Scheme {
     Http,
     Https,
