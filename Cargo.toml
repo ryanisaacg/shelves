@@ -7,6 +7,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.86"
+eframe = "0.28.1"
 rustls = "0.23.12"
 thiserror = "1.0.63"
 webpki = "0.22.4"
