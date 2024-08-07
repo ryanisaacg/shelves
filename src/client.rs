@@ -6,7 +6,7 @@ use std::{
     sync::Arc,
 };
 
-use rustls::{pki_types::InvalidDnsNameError, ClientConfig, ClientConnection, Stream};
+use rustls::{pki_types::InvalidDnsNameError, ClientConfig, ClientConnection};
 use thiserror::Error;
 
 use crate::url::{Scheme, Url, UrlError};

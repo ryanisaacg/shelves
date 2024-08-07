@@ -13,15 +13,19 @@ pub fn calculate_draw_list(input: &str, width: f32) -> Vec<DisplayListItem> {
 
     input
         .chars()
-        .map(|ch| {
+        .filter_map(|ch| {
             let layout = DisplayListItem { pos, ch };
             pos.x += HSTEP;
-            if pos.x >= width {
+            if pos.x >= width || ch == '\n' {
                 pos.x = 0.;
                 pos.y += VSTEP;
             }
 
-            layout
+            if ch == '\n' {
+                None
+            } else {
+                Some(layout)
+            }
         })
         .collect()
 }

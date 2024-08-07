@@ -7,7 +7,7 @@ mod url;
 
 use eframe::{
     egui::{self, Event, MouseWheelUnit, Vec2},
-    epaint::{Color32, Pos2},
+    epaint::Color32,
 };
 
 use client::Client;
