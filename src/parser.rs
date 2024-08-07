@@ -1,44 +1,69 @@
-use std::fmt::Write;
+use unicode_segmentation::UnicodeSegmentation;
 
-pub fn lex(html: &str) -> Result<String, std::fmt::Error> {
-    let mut result_buffer = String::new();
+#[derive(Debug)]
+pub enum Token {
+    Tag(String),
+    Word(String),
+}
+
+pub fn lex(html: &str) -> Vec<Token> {
+    let mut results = Vec::new();
 
     let mut state = ParseState::InTag;
-    let mut escape_sequence = String::new();
+    let mut buffer = String::new();
 
-    for ch in html.chars() {
+    for grapheme in UnicodeSegmentation::graphemes(html, true) {
         if state == ParseState::InTag {
-            if ch == '>' {
+            if grapheme == ">" {
+                results.push(Token::Tag(buffer.clone()));
+                buffer.clear();
                 state = ParseState::Text;
+            } else {
+                buffer.push_str(grapheme);
             }
         } else {
-            match ch {
-                '<' => {
+            match grapheme {
+                "<" => {
+                    results.push(Token::Word(buffer.clone()));
+                    buffer.clear();
                     state = ParseState::InTag;
                 }
-                '&' => {
+                "&" => {
+                    results.push(Token::Word(buffer.clone()));
+                    buffer.clear();
                     state = ParseState::EscapeSequence;
                 }
-                ';' if state == ParseState::EscapeSequence => {
-                    match escape_sequence.as_str() {
-                        "lt" => write!(result_buffer, "<"),
-                        "gt" => write!(result_buffer, ">"),
-                        not_recognized => write!(result_buffer, "&{};", not_recognized),
-                    }?;
-                    escape_sequence.clear();
+                ";" if state == ParseState::EscapeSequence => {
+                    results.push(Token::Word(match buffer.as_str() {
+                        "lt" => "<".to_string(),
+                        "gt" => ">".to_string(),
+                        not_recognized => format!("&{buffer};"),
+                    }));
+                    buffer.clear();
                     state = ParseState::Text;
                 }
                 _ if state == ParseState::EscapeSequence => {
-                    escape_sequence.push(ch);
+                    if grapheme.trim().is_empty() {
+                        results.push(Token::Word(format!("&{buffer}")));
+                        buffer.clear();
+                        state = ParseState::Text;
+                    } else {
+                        buffer.push_str(grapheme);
+                    }
                 }
                 _ => {
-                    write!(result_buffer, "{ch}")?;
+                    if grapheme.trim().is_empty() {
+                        results.push(Token::Word(buffer.clone()));
+                        buffer.clear();
+                    } else {
+                        buffer.push_str(grapheme);
+                    }
                 }
             }
         }
     }
 
-    Ok(result_buffer)
+    results
 }
 
 #[derive(Copy, Clone, PartialEq, Eq)]

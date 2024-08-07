@@ -11,10 +11,10 @@ use eframe::{
 };
 
 use client::Client;
-use layout::{DisplayListItem, VSTEP};
+use layout::{layout, DisplayListItem, FormatToken, VSTEP};
 use url::Url;
 
-use crate::layout::calculate_draw_list;
+use crate::layout::format_tokens;
 
 fn main() -> anyhow::Result<()> {
     let mut args = std::env::args();
@@ -32,21 +32,21 @@ fn main() -> anyhow::Result<()> {
     let resp = client.request(&input)?;
 
     eprintln!("{:?}", resp.headers);
-    let contents = parser::lex(resp.body.as_str()?)?.trim().to_string();
+    let contents = dbg!(parser::lex(resp.body.as_str()?));
 
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default().with_inner_size([WIDTH, HEIGHT]),
         ..Default::default()
     };
 
-    let draw_list = calculate_draw_list(contents.as_str(), WIDTH);
+    let format_tokens = format_tokens(&contents[..]);
 
     eframe::run_native(
         "My egui App",
         options,
         Box::new(|_cc| {
             Ok(Box::new(Browser {
-                draw_list,
+                format_tokens,
                 scroll: Vec2::ZERO,
             }))
         }),
@@ -57,7 +57,7 @@ fn main() -> anyhow::Result<()> {
 }
 
 struct Browser {
-    draw_list: Vec<DisplayListItem>,
+    format_tokens: Vec<FormatToken>,
     scroll: Vec2,
 }
 
@@ -67,15 +67,13 @@ const HEIGHT: f32 = 600.;
 impl eframe::App for Browser {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
-            for display in self.draw_list.iter() {
-                let rendered_char = ui.painter().layout(
-                    display.ch.to_string(),
+            let draw_list = layout(ui, &self.format_tokens[..]);
+            for display in draw_list.iter() {
+                ui.painter().galley(
+                    display.pos + self.scroll,
+                    display.galley.clone(),
                     Default::default(),
-                    Color32::WHITE,
-                    800.0,
                 );
-                ui.painter()
-                    .galley(display.pos + self.scroll, rendered_char, Default::default());
             }
         });
     }

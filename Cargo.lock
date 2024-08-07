@@ -2611,6 +2611,7 @@ dependencies = [
  "eframe",
  "rustls",
  "thiserror",
+ "unicode-segmentation",
  "webpki",
  "webpki-roots",
 ]
