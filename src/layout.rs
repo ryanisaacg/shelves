@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use eframe::{
-    egui::{text::LayoutJob, Color32, FontFamily, FontId, Galley, Stroke, TextFormat, Ui},
+    egui::{text::LayoutJob, Color32, FontFamily, FontId, Galley, TextFormat, Ui},
     epaint::Pos2,
 };
 
@@ -86,18 +86,16 @@ pub fn layout(ui: &Ui, tokens: &[FormatToken]) -> Vec<DisplayListItem> {
                 let word_width = galley.rect.width();
                 // TODO: padding
                 if pos.x + word_width > ui.min_rect().width() {
-                    pos.x = 0.;
-                    pos.y += galley.rect.height();
-                    display_list.push(DisplayListItem { pos, galley });
-                } else {
-                    display_list.push(DisplayListItem { pos, galley });
-                    pos.x += word_width + space.rect.width();
+                    pos.x = 0.0;
+                    pos.y += galley.rect.height().max(VSTEP);
                 }
+                display_list.push(DisplayListItem { pos, galley });
+                pos.x += word_width + space.rect.width();
             }
             FormatToken::Linebreak => {
                 // TODO: wrong height
-                pos.x = 0.;
-                pos.y += VSTEP;
+                pos.x = 0.0;
+                pos.y += VSTEP * 1.5;
             }
         }
     }

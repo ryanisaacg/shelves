@@ -32,7 +32,7 @@ fn main() -> anyhow::Result<()> {
     let resp = client.request(&input)?;
 
     eprintln!("{:?}", resp.headers);
-    let contents = dbg!(parser::lex(resp.body.as_str()?));
+    let contents = parser::lex(resp.body.as_str()?);
 
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default().with_inner_size([WIDTH, HEIGHT]),
