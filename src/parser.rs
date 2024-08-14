@@ -9,7 +9,7 @@ pub enum Token {
 pub fn lex(html: &str) -> Vec<Token> {
     let mut results = Vec::new();
 
-    let mut state = ParseState::InTag;
+    let mut state = ParseState::Text;
     let mut buffer = String::new();
 
     for grapheme in UnicodeSegmentation::graphemes(html, true) {

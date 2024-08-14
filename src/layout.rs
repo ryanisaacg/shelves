@@ -18,6 +18,7 @@ pub enum FormatToken {
 pub fn format_tokens(tokens: &[Token]) -> Vec<FormatToken> {
     let mut italics = false;
     let mut bold = false;
+    let mut size = 16.0;
 
     let mut format_tokens = Vec::new();
 
@@ -31,6 +32,10 @@ pub fn format_tokens(tokens: &[Token]) -> Vec<FormatToken> {
                 "br" | "/br" | "/p" => {
                     format_tokens.push(FormatToken::Linebreak);
                 }
+                "small" => size -= 2.0,
+                "/small" => size += 2.0,
+                "big" => size += 4.0,
+                "/big" => size -= 4.0,
                 _ => {}
             },
             Token::Word(word) => {
@@ -43,7 +48,7 @@ pub fn format_tokens(tokens: &[Token]) -> Vec<FormatToken> {
                     word,
                     0.,
                     TextFormat {
-                        font_id: FontId::new(12.0, FontFamily::Proportional),
+                        font_id: FontId::new(size, FontFamily::Proportional),
                         // TODO: this is no good, don't hardcode colors
                         color: if bold {
                             Color32::WHITE
