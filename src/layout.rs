@@ -74,8 +74,9 @@ pub struct DisplayListItem {
 
 pub fn layout(ui: &Ui, tokens: &[FormatToken]) -> Vec<DisplayListItem> {
     let mut display_list = Vec::new();
+    let mut line_buffer = Vec::new();
 
-    let mut pos = Pos2::new(0., 0.);
+    let mut cursor = Pos2::new(0., 0.);
     for token in tokens.iter() {
         match token {
             FormatToken::Text { layout } => {
@@ -89,21 +90,56 @@ pub fn layout(ui: &Ui, tokens: &[FormatToken]) -> Vec<DisplayListItem> {
                     .layout_no_wrap(" ".to_string(), font, Color32::BLACK);
                 let galley = ui.painter().layout_job(layout.clone());
                 let word_width = galley.rect.width();
-                // TODO: padding
-                if pos.x + word_width > ui.min_rect().width() {
-                    pos.x = 0.0;
-                    pos.y += galley.rect.height().max(VSTEP);
+                if cursor.x + word_width > ui.min_rect().width() {
+                    flush(&mut line_buffer, &mut display_list, &mut cursor);
                 }
-                display_list.push(DisplayListItem { pos, galley });
-                pos.x += word_width + space.rect.width();
+                line_buffer.push(DisplayListItem {
+                    pos: cursor,
+                    galley,
+                });
+                cursor.x += word_width + space.rect.width();
             }
             FormatToken::Linebreak => {
-                // TODO: wrong height
-                pos.x = 0.0;
-                pos.y += VSTEP * 1.5;
+                flush(&mut line_buffer, &mut display_list, &mut cursor);
             }
         }
     }
 
+    flush(&mut line_buffer, &mut display_list, &mut cursor);
+
     display_list
+}
+
+fn flush(
+    line_buffer: &mut Vec<DisplayListItem>,
+    display_list: &mut Vec<DisplayListItem>,
+    cursor: &mut Pos2,
+) {
+    cursor.x = 0.0;
+    let max_ascent = line_buffer
+        .iter()
+        .filter_map(|item| galley_max_ascent(&item.galley))
+        .reduce(f32::max)
+        .unwrap_or(0.0);
+    let baseline = cursor.y + 1.25 * max_ascent;
+    let max_descent = line_buffer
+        .iter()
+        .map(|item| item.galley.mesh_bounds.bottom() - item.galley.mesh_bounds.center().y)
+        .reduce(f32::max)
+        .unwrap_or(0.0);
+    for mut word in line_buffer.drain(..) {
+        word.pos.y = baseline - galley_max_ascent(&word.galley).unwrap_or(0.0);
+        display_list.push(word);
+    }
+    cursor.y = baseline + 1.25 * max_descent;
+    cursor.y += VSTEP;
+}
+
+fn galley_max_ascent(galley: &Galley) -> Option<f32> {
+    galley
+        .rows
+        .iter()
+        .flat_map(|row| row.glyphs.iter())
+        .map(|glyph| glyph.ascent)
+        .reduce(f32::max)
 }
